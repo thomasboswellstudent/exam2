@@ -1,0 +1,174 @@
+---
+title: "Exam 2"
+author: "Thomas Boswell"
+date: "6/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Exam 2
+
+This is my submission for Exam 2 for Data Science in the Social World 
+
+## College Scorecard Questions 
+
+1. Please Clear the Environment in R 
+
+```{r, echo = TRUE}
+
+rm(list=ls(all=TRUE))
+
+```
+
+2. Load the College Scorecard Data and call it college_scorecard 
+
+```{r, echo = TRUE}
+# import data using rio, call college_scorecard
+library(rio)
+college_scorecard <- import("2021_exam2_data.xlsx", which = 4)
+```
+
+3. Provide Summary Statistics for the college_scorecard dataset
+
+```{r, echo = TRUE}
+# use stargazer, type text
+library(stargazer)
+stargazer(college_scorecard, type = "text")
+```
+
+4. Create a Smaller Dataset
+
+```{r, echo = TRUE}
+# use subset to call 2014, 2015 data, students from 4 year colleges, universities located in Texas and Lousiana, name data small scorecard 
+
+library(tidyverse)
+small_scorecard <- 
+  college_scorecard %>%
+  filter(year == "2014" | year == "2015") %>%
+  filter(pred_degree_awarded_ipeds == 3) %>%
+  filter(state_abbr == "TX" | state_abbr == "LA")
+```
+
+5. Collapse the Small Scorecard 
+
+```{r}
+even_smaller_scorecard <-
+  small_scorecard %>% 
+  group_by(state_abbr, inst_name) %>%
+  summarize(across(where(is.numeric), sum)) %>% 
+  summarize(across(where(is.numeric), mean))
+```
+
+6. Create a Bar Plot to demonstrate the percent of people working 
+
+```{r}
+library(ggplot2)
+even_smaller_scorecard$
+```
+
+7. Unsure How to Complete these because I couldn't get the collapse to work. 
+
+## Avocado Sales 
+
+8. Load the avocados dataset in R, call it "avocados"
+
+```{r, echo = TRUE}
+avocados <- import("2021_exam_data.xlsx", which = 2)
+```
+
+9. Create a new variable called "year" that captures the year in which avocados were sold 
+
+```{r, echo = TRUE}
+library(lubridate)
+avocados <-
+  avocados %>%
+  dplyr::mutate(year = lubridate::year(date))
+```
+
+10. Use WDI package to deflate the average_price variable. Call the new variable "deflated price_XXXX"
+
+```{r, echo = TRUE}
+library(WDI)
+#Find the Deflator Data using WDI package 
+deflator_data <- WDI(country = "all", indicator = c("NY.GDP.DEFL.ZS"),
+                     start = 1960,
+                     end = 2018,
+                     extra = FALSE,
+                     cache = NULL)
+
+#Get USD
+
+usd_deflator <- subset(deflator_data, country == "United States")
+
+#Find the base year 
+subset(usd_deflater, NY.GDP.DEFL.ZS == 100)
+
+#Join the Deflation Data 
+deflated_avocados <- left_join(avocados,
+                           usd_deflator,
+                           by=c("year"))
+
+#Create a deflated avocado variable 
+deflated_avocados$deflated_price_2015 <- deflated_avocados$average_price/(deflated_avocados$NY.GDP.DEFL.ZS/100)
+```
+
+11. Collapse the data frame to obtain the average deflated price of the avocados each year. 
+
+```{r, echo = TRUE}
+collapsed_avocados <-
+  deflated_avocados %>%
+  group_by(year) %>
+  summarize(across(where(is.numeric), mean)
+
+head(collapsed_avocados)
+```
+
+12. Reshape the deflated collapsed_avocados data frame wide call wide avocados 
+
+```{r}
+wide_avocados <-
+  collapsed_avocados%>% 
+  pivot_wider(id_cols = c("total_volume"),
+               names_from = "year",
+               values_from = "deflated_prices",
+              names_prefix = "year_")
+
+head(wide_avocados)
+```
+
+13. Label your variables in the wide_avocados df
+
+```{r}
+# label packages 
+install.packages("labelled")
+library(labelled)
+
+# label our data 
+var_label(wide_avocados)<- list('year_2015' = "2015 year",
+      'year_2016' = "2016 year"
+      'year_2017' = "2017 year"
+      'year_2018' = "2018 year"
+      'total_volume = "Volume Sold",
+
+```
+
+14. Load the training dataset in R. Call it training 
+
+```{r}
+training <- import("2021_exam2_data.xlsx", which = 3)
+```
+
+15. Reshape the training data 
+
+```{r}
+training_long <-
+  pivot_longer(cols = starts_with("re_"),
+names_to = "year", 
+names_prefix = "re_",
+values_to = "real_deflated_earnings")
+```
+
+16-19. Incomplete 
