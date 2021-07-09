@@ -1,0 +1,265 @@
+---
+title: "Exam3"
+author: "Thomas Boswell"
+date: "7/8/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Exam 3
+
+## Questions 
+
+1. Clear Environment 
+```{r}
+#clear environment 
+rm(list = ls(all=TRUE))
+```
+
+2. Download data on female labor force using WDI Package
+```{r}
+#call WDI library
+library(WDI)
+
+#download female labor force part, save dataframe as female_lfp
+female_lfp <-  WDI(country = "all", indicator = c("SL.TLF.CACT.FE.ZS"),
+                     start = 2010,
+                     end = 2015,
+                     extra = FALSE,
+                     cache = NULL)
+```
+
+3. Rename variable 
+```{r}
+#rename the female labor force variable to flfp using setnames in data.table package
+library(data.table)
+setnames(female_lfp, "SL.TLF.CACT.FE.ZS", "flfp" )
+```
+
+4. Collapse the female_lfp data by mean value of flfp for each country
+```{r}
+#load tidyverse
+library(tidyverse)
+
+#collapse data by mean of flfp for each country, keep ISO-2 and country name variables 
+collapsed_flfp <- female_lfp %>%
+  group_by(country, iso2c)%>%
+  summarise(mean_flfp = mean(flfp, na.rm=TRUE))
+```
+
+5. Use R to show countries with mean_flfp below 15%
+```{r}
+#use filter to find countries with mean below 15%. Figure represents percentage
+collapsed_flfp %>%
+  filter(mean_flfp < 15)
+```
+
+6. Present a map of polygon data using the world borders shape file and the collapsed_flfp (several steps)
+```{r}
+#load necessary mapping libraries 
+library(rio)
+library(tidyverse)
+library(rlang)
+library(googlesheets4)
+library(labelled)
+library(data.table)
+library(varhandle)
+library(ggrepel)
+library(geosphere)
+library(rgeos)
+library(viridis)
+library(mapview)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(devtools)
+library(remotes)
+library(raster)
+library(sp)
+library(sf)
+library(rnaturalearthhires) #from github
+library(ggsflabel) # from github
+library(Imap)
+
+#import world borders shape file 
+world_borders <- st_read("C:/Users/thoma/OneDrive/Desktop/World Shape Files")
+
+#transform borders 
+border_transform <- st_transform(world_borders, "+proj=latlong +ellps=WGS84 +datum=WGS84")
+
+#remove world_borders
+rm(world_borders)
+
+#add ISO3 code to the collapsed_flfp to prep for merge with border_transform
+library(countrycode)
+
+collapsed_flfp$ISO3 <- countrycode(sourcevar = collapsed_flfp$country,
+                                       origin = "country.name",
+                                       destination = "iso3c",
+                                       warn = TRUE)
+
+#remove the regional designations to retain only countries. Do this by filtering ISO3 = NA
+collapsed_flfp <- 
+  collapsed_flfp %>% 
+  dplyr::filter(!(ISO3 =="NA"))
+
+#subset the collapsed data to remove na where mean_flfp is not available 
+collapsed_flfp2 <- na.omit(subset(collapsed_flfp, select = c("country", "mean_flfp", "ISO3")))
+
+#merge the two datasets by ISO3
+merged_data <- left_join(border_transform, collapsed_flfp2, by = "ISO3")
+
+#messed up so download new map since I only wanted polygon data from the border transform map download new map with ne_countries
+
+world <- ne_countries(scale = "large", returnclass = "sf")
+
+
+#create filled map 
+mean_flfp_map <- ggplot()+
+  geom_sf(data = world )+
+  geom_sf(data = merged_data, aes(fill = mean_flfp))+
+  scale_fill_viridis(option = "viridis")+
+  ggtitle("World Average Female Labor Force Participation Rate by Country, 2010-2015")+
+  theme_void()
+
+print(mean_flfp_map)
+
+```
+
+7. Based on the map, it's somewhat surprising to see a cluster of yellow colored avg labor force participation (high) in Madagascar and the southeast coast of Africa. Also after tabling, this was a good exercise and I would wonder if it has to do with high mortality rates of men in these countries and so female labor participation is higher. Could also be cultural where men and women provide at high rates. Could also be an economic necessity. But interest to study. Good exercise. 
+
+8. Use r to show the cluster of states mentioned above in the previous question. 
+```{r}
+#filter the countries with high mean_flfp, call df high_mean_flfp
+high_mean_flfp <- collapsed_flfp2 %>%
+  filter(mean_flfp > 75)
+
+#table the results to show the countries written out
+table(high_mean_flfp$country)
+
+```
+
+9. In a shiny app there are three components.
+- UI <- fluidPage()
+- server <- function(input,output)
+- shinyApp(ui, server)
+
+10. Pull Mike D and Mike F report
+```{r}
+#load libraries
+library(tidyverse)
+library(tidytext)
+library(knitr)
+library(janeaustenr)
+library(stringr)
+library(ggplot2)
+library(pdftools)
+library(topicmodels)
+library(wordcloud)
+library(reshape2)
+library(lubridate, warn.conflicts = FALSE)
+library(readr)
+
+#pull Mike D and Mike F report using pdf_text
+report <- pdf_text(pdf = "https://pdf.usaid.gov/pdf_docs/PA00TNMJ.pdf")
+
+```
+
+11. Convert report to armeniatext
+```{r}
+#use as.data.frame to create a dataframe, stingsAsFactors = FALSE
+armeniareport <- as.data.frame(report, stringsAsFactors = FALSE)
+```
+
+12. Tokenize armenia report, remove stop words
+```{r}
+#call the stop words data 
+data("stop_words")
+
+#tokenize with unnest_tokens
+tidy_armeniatext <- armeniareport %>%
+  unnest_tokens(word, report)%>%
+  anti_join(stop_words)
+```
+
+13. Figure top 5 most used words
+```{r}
+#use count to figure the top words and sort = TRUE
+tidy_armeniatext %>%
+  count(word, sort=TRUE)
+```
+13.cont Top 5 words are law, corruption, rule, armenia, and european in that order
+
+14. Load the Billboard Hot 100 and call hot100exam
+```{r}
+#load libraries
+library(rvest)
+library(dplyr)
+library(xml2)
+
+#call billboard url
+hot100url <- "https://www.billboard.com/charts/hot-100"
+
+#read the url using read_html call it hot100exam
+hot100exam <- read_html(hot100url)
+
+#start pulling data (taken from modules)
+# create a rank list
+rank <- hot100exam %>%
+  # pull the body nodes with html_node
+  rvest::html_node('body') %>%
+  # use xml_find_all to get all rankings, not just single artist/song whatever
+  xml2::xml_find_all("//span[contains(@class,
+                     'chart-element__rank__number')]") %>%
+    #use rvest and html_text to pull the data out of this
+    rvest::html_text()
+
+# create artist list 
+artist <- hot100exam %>%
+  html_node("body")%>%
+  xml_find_all("//span[contains(@class,
+               'chart-element__information__artist')]") %>%
+  html_text()
+
+# create song list 
+title <- hot100exam %>%
+  html_node("body")%>%
+  xml_find_all("//span[contains(@class,
+               'chart-element__information__song')]")%>%
+  html_text()
+
+# create a week list (this is how I would have done it but I can't figure out how to get a last week vector that isn't empty. I am applying another method I learned while practicing this module for the exam)
+
+#last_week2 <- hot100exam%>%
+#  html_nodes("body")%>%
+#  xml_find_all("//div [contains(@class,
+#               chart-element__meta text--center color--secondary text--last')]")%>%
+#  html_text()
+
+#alternative method using a selector gadget 
+last_week_code <- html_nodes(hot100exam, '.text--last')
+
+#turn list into a vector of data 
+last_week <- html_text(last_week_code)
+
+#way above didn't work either, I got double the values. 
+
+#create billboard list 
+
+hot100examfinal <- data.frame(rank,artist,title,last_week)
+
+#print hot100examfinal
+hot100examfinal
+```
+
+17. Export some of the files
+```{r}
+#export tidy_armenia, hot100examfinal, collapsedflfp2, mean_flfp_map
+
+export(tidy_armeniatext, "tidy_armenia.csv")
+export(collapsed_flfp2, "collapsed_flfp2.csv")
+export(hot100examfinal, "hot100examfinal.csv")
+```
+
